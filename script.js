@@ -76,9 +76,9 @@ video.addEventListener('ended', () => {
 });
 
 // Google Sheets API 设置
-const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
-const API_KEY = 'YOUR_GOOGLE_API_KEY';
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID';
+const CLIENT_ID = '413262948577-ftjqvabftsu94c46b684s606sjka0ogt.apps.googleusercontent.com';
+const API_KEY = 'AIzaSyB-IJvPI-umRSFCl26-50-CMOhL6Bgt7Iw';
+const SPREADSHEET_ID = '1Ivu2k28j8Q5HmtOpK7ya33YnsRX3UBmZH6J_mS-1D2k';
 const DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 
