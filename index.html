@@ -3,50 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>视频标注工具 - GitHub版</title>
-    <link rel="stylesheet" href="styles.css">
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+    <title>视频数据收集</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        video {
+            max-width: 80%;
+            margin: 20px 0;
+        }
+        #inputPrompt {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border: 1px solid #ccc;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        #inputPrompt input {
+            margin: 10px 0;
+            padding: 5px;
+            width: 200px;
+        }
+        #inputPrompt button {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1>视频标注工具</h1>
-        
-        <div class="video-container">
-            <video id="video" controls>
-                <source id="video-source" type="video/mp4">
-                您的浏览器不支持视频播放
-            </video>
-        </div>
-        
-        <div class="controls">
-            <button id="start-btn">开始标注</button>
-            <button id="stop-btn" disabled>停止</button>
-            <input type="url" id="video-url" placeholder="输入视频URL" value="https://example.com/sample.mp4">
-            <button id="load-btn">加载视频</button>
-        </div>
-        
-        <div class="progress-container">
-            <div id="progress-bar"></div>
-            <span id="time-display">0.00s / 0.00s</span>
-        </div>
-        
-        <div id="feedback-modal" class="modal">
-            <div class="modal-content">
-                <h3>时间点: <span id="current-time">0.00</span>秒</h3>
-                <textarea id="feedback-input" placeholder="请输入反馈..."></textarea>
-                <button id="submit-btn">提交</button>
-            </div>
-        </div>
-        
-        <div class="feedback-list">
-            <h3>已收集的反馈</h3>
-            <div id="feedback-items"></div>
-        </div>
+    <h1>视频数据收集</h1>
+    <!-- 替换为你的视频 URL -->
+    <video id="myVideo" controls>
+        <source src="YOUR_VIDEO_URL_HERE" type="video/mp4">
+        你的浏览器不支持视频播放。
+    </video>
+    <div id="inputPrompt">
+        <p>请输入你的判断结果：</p>
+        <input type="text" id="userInput" placeholder="输入结果">
+        <br>
+        <button onclick="submitInput()">提交</button>
     </div>
+    <p>状态：<span id="status">等待播放</span></p>
 
-    <script src="firebase-config.js"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
