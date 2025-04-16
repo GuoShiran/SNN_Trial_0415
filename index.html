@@ -34,7 +34,7 @@
             border-radius: 8px;
         }
         video {
-            display: none; /* 隐藏视频，仅用于截屏 */
+            display: none;
         }
         #inputPrompt {
             position: absolute;
@@ -87,10 +87,24 @@
         canvas {
             display: none;
         }
+        #startButton {
+            margin: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #0288d1;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #startButton:hover {
+            background-color: #0277bd;
+        }
     </style>
 </head>
 <body>
     <h1>视频数据收集</h1>
+    <button id="startButton">开始截屏</button>
     <div id="videoContainer">
         <video id="myVideo">
             <source src="./4922f69a39021a30544f302b2e126d82.mp4" type="video/mp4">
@@ -124,28 +138,26 @@
         const frameDisplay = document.getElementById('frameDisplay');
         const inputPrompt = document.getElementById('inputPrompt');
         const status = document.getElementById('status');
+        const startButton = document.getElementById('startButton');
         const canvas = document.getElementById('videoCanvas');
         const ctx = canvas.getContext('2d');
 
-        let modules = []; // 存储所有模块，每个模块是一个截屏数组
-        let currentModuleIndex = 0; // 当前模块索引
-        let currentFrameIndex = 0; // 当前模块中的帧索引
+        let modules = [];
+        let currentModuleIndex = 0;
+        let currentFrameIndex = 0;
         let lastFrameData = null;
         let isCapturing = false;
         let collectedData = [];
 
-        const CAPTURE_INTERVAL = 20; // 截屏间隔，单位：毫秒
-        const CHANGE_DELAY = 20; // 画面变化后延迟，单位：毫秒
+        const CAPTURE_INTERVAL = 20;
+        const CHANGE_DELAY = 20;
 
         // 开始截屏
         function startCapturing() {
-            if (video.ended) {
-                status.textContent = '视频已结束，准备展示';
-                showNextFrame();
-                return;
-            }
-
+            status.textContent = '截屏中...';
+            startButton.style.display = 'none'; // 隐藏开始按钮
             isCapturing = true;
+            video.currentTime = 0; // 从头开始
             video.play().catch(err => {
                 console.error('播放失败:', err);
                 status.textContent = '播放失败，请检查视频';
@@ -157,6 +169,10 @@
             function captureFrame() {
                 if (!isCapturing || video.ended) {
                     isCapturing = false;
+                    console.log('截屏完成，模块数:', modules.length);
+                    console.log('所有模块:', modules);
+                    status.textContent = '截屏完成，准备展示';
+                    showNextFrame();
                     return;
                 }
 
@@ -165,14 +181,12 @@
                 const currentFrameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
                 const frameDataUrl = canvas.toDataURL('image/png');
 
-                // 添加到当前模块
                 currentModule.push({
                     dataUrl: frameDataUrl,
                     time: video.currentTime
                 });
 
                 // 检查画面变化
-                let shouldPause = false;
                 if (lastFrameData) {
                     let diffCount = 0;
                     for (let i = 0; i < currentFrameData.length; i += 4) {
@@ -184,16 +198,13 @@
                         }
                     }
                     const diffPercentage = (diffCount / (currentFrameData.length / 4)) * 100;
+                    console.log(`帧差异百分比: ${diffPercentage.toFixed(2)}%`);
 
-                    if (diffPercentage < 1) {
-                        // 画面无变化，暂停截屏
+                    if (diffPercentage < 2) { // 提高阈值
                         video.pause();
                         isCapturing = false;
                         status.textContent = '画面无变化，等待变化';
                         return;
-                    } else {
-                        // 画面有变化，继续截屏
-                        status.textContent = `截屏中：模块 ${modules.length}`;
                     }
                 }
 
@@ -223,8 +234,7 @@
                 }
                 const diffPercentage = (diffCount / (currentFrameData.length / 4)) * 100;
 
-                if (diffPercentage >= 1) {
-                    // 画面变化，延迟 20ms 开启新模块
+                if (diffPercentage >= 2) {
                     setTimeout(() => {
                         lastFrameData = new Uint8ClampedArray(currentFrameData);
                         startCapturing();
@@ -243,8 +253,15 @@
             }
 
             const currentModule = modules[currentModuleIndex];
+            if (!currentModule || currentModule.length === 0) {
+                console.error('当前模块为空，跳到下一模块');
+                currentModuleIndex++;
+                currentFrameIndex = 0;
+                showNextFrame();
+                return;
+            }
+
             if (currentFrameIndex >= currentModule.length) {
-                // 当前模块帧已展示完，进入下一模块
                 currentModuleIndex++;
                 currentFrameIndex = 0;
                 showNextFrame();
@@ -260,6 +277,8 @@
         // 用户提交输入
         function submitInput(value) {
             const currentModule = modules[currentModuleIndex];
+            if (!currentModule || currentFrameIndex >= currentModule.length) return;
+
             const frame = currentModule[currentFrameIndex];
 
             const data = {
@@ -275,20 +294,17 @@
             inputPrompt.style.display = 'none';
 
             if (value !== 'n') {
-                // 跳过当前模块剩余帧，进入下一模块
                 currentModuleIndex++;
                 currentFrameIndex = 0;
             } else {
-                // 继续展示当前模块的下一帧
                 currentFrameIndex++;
             }
 
             showNextFrame();
         }
 
-        // 视频加载完成后开始截屏
-        video.addEventListener('canplay', () => {
-            status.textContent = '视频已加载，开始截屏';
+        // 点击开始按钮
+        startButton.addEventListener('click', () => {
             startCapturing();
         });
 
