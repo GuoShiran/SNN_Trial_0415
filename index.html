@@ -29,14 +29,13 @@
             background: white;
             padding: 10px;
         }
-        #frameDisplay {
+        video {
             max-width: 100%;
+            display: block;
             border-radius: 8px;
         }
-        video {
-            display: none;
-        }
         #inputPrompt {
+            display: none;
             position: absolute;
             left: 0;
             top: 100%;
@@ -87,30 +86,15 @@
         canvas {
             display: none;
         }
-        #startButton {
-            margin: 20px;
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #0288d1;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-        #startButton:hover {
-            background-color: #0277bd;
-        }
     </style>
 </head>
 <body>
     <h1>视频数据收集</h1>
-    <button id="startButton">开始截屏</button>
     <div id="videoContainer">
-        <video id="myVideo">
+        <video id="myVideo" controls>
             <source src="./4922f69a39021a30544f302b2e126d82.mp4" type="video/mp4">
             你的浏览器不支持视频播放。
         </video>
-        <img id="frameDisplay" src="" alt="视频截屏">
         <div id="inputPrompt">
             <p>请选择你的判断结果：</p>
             <div class="button-grid">
@@ -128,97 +112,53 @@
             </div>
         </div>
     </div>
-    <p id="statusContainer">状态：<span id="status">等待开始</span></p>
+    <p id="statusContainer">状态：<span id="status">等待播放</span></p>
 
     <canvas id="videoCanvas" width="80" height="45"></canvas>
 
     <script src="https://apis.google.com/js/api.js"></script>
     <script>
         const video = document.getElementById('myVideo');
-        const frameDisplay = document.getElementById('frameDisplay');
         const inputPrompt = document.getElementById('inputPrompt');
         const status = document.getElementById('status');
-        const startButton = document.getElementById('startButton');
         const canvas = document.getElementById('videoCanvas');
         const ctx = canvas.getContext('2d');
-
-        let modules = [];
-        let currentModuleIndex = 0;
-        let currentFrameIndex = 0;
-        let lastFrameData = null;
-        let isCapturing = false;
         let collectedData = [];
+        let lastFrameData = null;
+        let isPlaying = false;
+        let lastPlayTime = 0;
+        const PLAY_INTERVAL = 30; // 播放间隔，单位：毫秒
 
-        const CAPTURE_INTERVAL = 20;
-        const CHANGE_DELAY = 20;
-
-        // 开始截屏
-        function startCapturing() {
-            status.textContent = '截屏中...';
-            startButton.style.display = 'none'; // 隐藏开始按钮
-            isCapturing = true;
-            video.currentTime = 0; // 从头开始
+        // 播放控制逻辑
+        function playAndCheck() {
+            if (!isPlaying) return;
+            lastPlayTime = performance.now();
             video.play().catch(err => {
                 console.error('播放失败:', err);
                 status.textContent = '播放失败，请检查视频';
             });
 
-            let currentModule = [];
-            modules.push(currentModule);
+            setTimeout(() => {
+                if (!isPlaying || video.ended) return;
+                const elapsed = performance.now() - lastPlayTime;
+                console.log(`实际播放间隔: ${elapsed.toFixed(2)}ms`); // 调试日志
 
-            function captureFrame() {
-                if (!isCapturing || video.ended) {
-                    isCapturing = false;
-                    console.log('截屏完成，模块数:', modules.length);
-                    console.log('所有模块:', modules);
-                    status.textContent = '截屏完成，准备展示';
-                    showNextFrame();
-                    return;
+                video.pause();
+                if (video.paused) {
+                    checkFrameChange();
+                } else {
+                    console.error('视频未暂停，尝试再次暂停');
+                    video.pause();
+                    setTimeout(() => {
+                        if (video.paused) checkFrameChange();
+                        else console.error('视频仍然未暂停');
+                    }, 10);
                 }
-
-                // 截屏
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const currentFrameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-                const frameDataUrl = canvas.toDataURL('image/png');
-
-                currentModule.push({
-                    dataUrl: frameDataUrl,
-                    time: video.currentTime
-                });
-
-                // 检查画面变化
-                if (lastFrameData) {
-                    let diffCount = 0;
-                    for (let i = 0; i < currentFrameData.length; i += 4) {
-                        const rDiff = Math.abs(currentFrameData[i] - lastFrameData[i]);
-                        const gDiff = Math.abs(currentFrameData[i + 1] - lastFrameData[i + 1]);
-                        const bDiff = Math.abs(currentFrameData[i + 2] - lastFrameData[i + 2]);
-                        if (rDiff > 10 || gDiff > 10 || bDiff > 10) {
-                            diffCount++;
-                        }
-                    }
-                    const diffPercentage = (diffCount / (currentFrameData.length / 4)) * 100;
-                    console.log(`帧差异百分比: ${diffPercentage.toFixed(2)}%`);
-
-                    if (diffPercentage < 2) { // 提高阈值
-                        video.pause();
-                        isCapturing = false;
-                        status.textContent = '画面无变化，等待变化';
-                        return;
-                    }
-                }
-
-                lastFrameData = new Uint8ClampedArray(currentFrameData);
-                setTimeout(captureFrame, CAPTURE_INTERVAL);
-            }
-
-            captureFrame();
+            }, PLAY_INTERVAL);
         }
 
-        // 监听画面变化以重新开始截屏
-        video.addEventListener('timeupdate', () => {
-            if (isCapturing || video.ended) return;
-
+        // 检查画面是否变化
+        function checkFrameChange() {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const currentFrameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
 
@@ -233,79 +173,70 @@
                     }
                 }
                 const diffPercentage = (diffCount / (currentFrameData.length / 4)) * 100;
+                console.log(`帧差异百分比: ${diffPercentage.toFixed(2)}%`); // 调试日志
 
-                if (diffPercentage >= 2) {
-                    setTimeout(() => {
-                        lastFrameData = new Uint8ClampedArray(currentFrameData);
-                        startCapturing();
-                    }, CHANGE_DELAY);
+                if (diffPercentage < 1) {
+                    status.textContent = '画面未变化，继续播放';
+                    playAndCheck();
+                    return;
                 }
             }
-        });
 
-        // 显示下一帧
-        function showNextFrame() {
-            if (currentModuleIndex >= modules.length) {
-                status.textContent = '所有模块已展示，数据已收集';
-                console.log('收集的数据：', collectedData);
-                alert('数据收集完成，请检查控制台或后端记录！');
-                return;
-            }
-
-            const currentModule = modules[currentModuleIndex];
-            if (!currentModule || currentModule.length === 0) {
-                console.error('当前模块为空，跳到下一模块');
-                currentModuleIndex++;
-                currentFrameIndex = 0;
-                showNextFrame();
-                return;
-            }
-
-            if (currentFrameIndex >= currentModule.length) {
-                currentModuleIndex++;
-                currentFrameIndex = 0;
-                showNextFrame();
-                return;
-            }
-
-            const frame = currentModule[currentFrameIndex];
-            frameDisplay.src = frame.dataUrl;
-            inputPrompt.style.display = 'block';
-            status.textContent = `模块 ${currentModuleIndex + 1}，帧 ${currentFrameIndex + 1}/${currentModule.length}`;
+            lastFrameData = new Uint8ClampedArray(currentFrameData);
+            showInputPrompt();
         }
 
-        // 用户提交输入
+        // 显示输入提示
+        function showInputPrompt() {
+            inputPrompt.style.display = 'block';
+            status.textContent = '等待用户选择';
+        }
+
+        // 提交用户输入
         function submitInput(value) {
-            const currentModule = modules[currentModuleIndex];
-            if (!currentModule || currentFrameIndex >= currentModule.length) return;
-
-            const frame = currentModule[currentFrameIndex];
-
             const data = {
                 timestamp: new Date().toISOString(),
-                videoTime: frame.time.toFixed(2),
+                videoTime: video.currentTime.toFixed(2),
                 userInput: value
             };
             collectedData.push(data);
 
             status.textContent = `已记录：时间=${data.videoTime}s, 选择=${data.userInput}`;
-            sendDataToGoogleSheets(data);
 
             inputPrompt.style.display = 'none';
 
-            if (value !== 'n') {
-                currentModuleIndex++;
-                currentFrameIndex = 0;
+            if (video.ended) {
+                status.textContent = '视频已结束，数据已收集';
+                console.log('收集的数据：', collectedData);
+                alert('数据收集完成，请检查控制台或后端记录！');
+                sendDataToGoogleSheets(data);
+                isPlaying = false;
             } else {
-                currentFrameIndex++;
+                playAndCheck();
+                sendDataToGoogleSheets(data);
             }
-
-            showNextFrame();
         }
 
-        // 点击开始按钮
-        startButton.addEventListener('click', () => {
-            startCapturing();
+        // 视频播放开始时启动逻辑
+        video.addEventListener('play', () => {
+            if (!isPlaying) {
+                isPlaying = true;
+                playAndCheck();
+            }
+        });
+
+        // 视频暂停时停止检查
+        video.addEventListener('pause', () => {
+            if (inputPrompt.style.display !== 'block') {
+                isPlaying = false;
+            }
+        });
+
+        // 视频结束时停止并显示数据
+        video.addEventListener('ended', () => {
+            isPlaying = false;
+            status.textContent = '视频已结束，数据已收集';
+            console.log('收集的数据：', collectedData);
         });
 
         // Google Sheets API 设置
@@ -351,4 +282,4 @@
         });
     </script>
 </body>
-</html>
+</html>index.html
