@@ -16,17 +16,22 @@
             max-width: 80%;
             margin: 20px 0;
         }
+        #videoContainer {
+            position: relative;
+            display: inline-block;
+        }
         #inputPrompt {
             display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            position: absolute;
+            left: 0;
+            top: 100%; /* 定位在视频底部 */
             background: white;
             padding: 20px;
             border: 1px solid #ccc;
             box-shadow: 0 0 10px rgba(0,0,0,0.3);
             z-index: 1000;
+            width: 100%;
+            text-align: center;
         }
         #inputPrompt button {
             margin: 5px;
@@ -41,47 +46,93 @@
         #inputPrompt button:hover {
             background-color: #45a049;
         }
+        canvas {
+            display: none; /* 隐藏 canvas */
+        }
     </style>
 </head>
 <body>
     <h1>视频数据收集</h1>
-    <video id="myVideo" controls>
-        <source src="./4922f69a39021a30544f302b2e126d82.mp4" type="video/mp4">
-        你的浏览器不支持视频播放。
-    </video>
-    <div id="inputPrompt">
-        <p>请选择你的判断结果：</p>
-        <button onclick="submitInput('0')">0</button>
-        <button onclick="submitInput('1')">1</button>
-        <button onclick="submitInput('2')">2</button>
-        <button onclick="submitInput('3')">3</button>
-        <button onclick="submitInput('4')">4</button>
-        <button onclick="submitInput('5')">5</button>
-        <button onclick="submitInput('6')">6</button>
-        <button onclick="submitInput('7')">7</button>
-        <button onclick="submitInput('8')">8</button>
-        <button onclick="submitInput('9')">9</button>
-        <button onclick="submitInput('n')">n</button>
+    <div id="videoContainer">
+        <video id="myVideo" controls>
+            <source src="./4922f69a39021a30544f302b2e126d82.mp4" type="video/mp4">
+            你的浏览器不支持视频播放。
+        </video>
+        <div id="inputPrompt">
+            <p>请选择你的判断结果：</p>
+            <button onclick="submitInput('0')">0</button>
+            <button onclick="submitInput('1')">1</button>
+            <button onclick="submitInput('2')">2</button>
+            <button onclick="submitInput('3')">3</button>
+            <button onclick="submitInput('4')">4</button>
+            <button onclick="submitInput('5')">5</button>
+            <button onclick="submitInput('6')">6</button>
+            <button onclick="submitInput('7')">7</button>
+            <button onclick="submitInput('8')">8</button>
+            <button onclick="submitInput('9')">9</button>
+            <button onclick="submitInput('n')">n</button>
+        </div>
     </div>
     <p>状态：<span id="status">等待播放</span></p>
 
+    <canvas id="videoCanvas" width="160" height="90"></canvas> <!-- 用于帧比较 -->
+
     <script src="https://apis.google.com/js/api.js"></script>
     <script>
-        // 视频元素
+        // 视频和元素
         const video = document.getElementById('myVideo');
         const inputPrompt = document.getElementById('inputPrompt');
         const status = document.getElementById('status');
+        const canvas = document.getElementById('videoCanvas');
+        const ctx = canvas.getContext('2d');
         let collectedData = [];
+        let lastFrameData = null;
+        let isPlaying = false;
 
-        // 播放 0.1 秒后暂停
-        function playForShortDuration() {
+        // 播放 0.1 秒后检查画面变化
+        function playAndCheck() {
+            if (!isPlaying) return;
             video.play();
             setTimeout(() => {
-                if (!video.paused) {
-                    video.pause();
-                    showInputPrompt();
+                if (!video.paused && !video.ended) {
+                    checkFrameChange();
                 }
-            }, 100); // 0.1 秒 = 100 毫秒
+            }, 100); // 0.1 秒
+        }
+
+        // 检查画面是否变化
+        function checkFrameChange() {
+            // 绘制当前帧到 canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const currentFrameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+            if (lastFrameData) {
+                // 计算帧间差异
+                let diffCount = 0;
+                for (let i = 0; i < currentFrameData.length; i += 4) {
+                    const rDiff = Math.abs(currentFrameData[i] - lastFrameData[i]);
+                    const gDiff = Math.abs(currentFrameData[i + 1] - lastFrameData[i + 1]);
+                    const bDiff = Math.abs(currentFrameData[i + 2] - lastFrameData[i + 2]);
+                    if (rDiff > 10 || gDiff > 10 || bDiff > 10) {
+                        diffCount++;
+                    }
+                }
+                const diffPercentage = (diffCount / (currentFrameData.length / 4)) * 100;
+
+                // 如果差异小于 1%，认为画面未变化，继续播放
+                if (diffPercentage < 1) {
+                    status.textContent = '画面未变化，继续播放';
+                    playAndCheck();
+                    return;
+                }
+            }
+
+            // 保存当前帧数据
+            lastFrameData = new Uint8ClampedArray(currentFrameData);
+
+            // 画面有变化，暂停并显示输入提示
+            video.pause();
+            showInputPrompt();
         }
 
         // 显示输入提示
@@ -95,7 +146,7 @@
             // 记录数据
             const data = {
                 timestamp: new Date().toISOString(),
-                videoTime: video.currentTime.toFixed(2), // 保留 2 位小数
+                videoTime: video.currentTime.toFixed(2),
                 userInput: value
             };
             collectedData.push(data);
@@ -106,25 +157,35 @@
             // 隐藏输入框并继续播放
             inputPrompt.style.display = 'none';
 
-            // 如果视频未结束，继续播放 0.1 秒
+            // 如果视频未结束，继续播放
             if (video.ended) {
                 status.textContent = '视频已结束，数据已收集';
                 console.log('收集的数据：', collectedData);
                 alert('数据收集完成，请检查控制台或后端记录！');
-                sendDataToGoogleSheets(data); // 视频结束时发送最后一条数据
+                sendDataToGoogleSheets(data);
+                isPlaying = false;
             } else {
-                playForShortDuration();
-                sendDataToGoogleSheets(data); // 每次输入后发送数据
+                playAndCheck();
+                sendDataToGoogleSheets(data);
             }
         }
 
         // 视频播放开始时启动逻辑
         video.addEventListener('play', () => {
-            playForShortDuration();
+            isPlaying = true;
+            playAndCheck();
+        });
+
+        // 视频暂停时停止检查
+        video.addEventListener('pause', () => {
+            if (inputPrompt.style.display !== 'block') {
+                isPlaying = false;
+            }
         });
 
         // 视频结束时停止并显示数据
         video.addEventListener('ended', () => {
+            isPlaying = false;
             status.textContent = '视频已结束，数据已收集';
             console.log('收集的数据：', collectedData);
         });
@@ -155,7 +216,7 @@
         function sendDataToGoogleSheets(data) {
             gapi.client.sheets.spreadsheets.values.append({
                 spreadsheetId: SPREADSHEET_ID,
-                range: 'Sheet1!A:C', // 假设数据写入 Sheet1 的 A、B、C 列
+                range: 'Sheet1!A:C',
                 valueInputOption: 'RAW',
                 insertDataOption: 'INSERT_ROWS',
                 resource: {
