@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>视频数据收集04161611</title>
+    <title>视频数据收集</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -89,7 +89,7 @@
         let lastFrameData = null;
         let isPlaying = false;
 
-        // 播放 0.1 秒后检查画面变化
+        // 播放 30 毫秒后检查画面变化
         function playAndCheck() {
             if (!isPlaying) return;
             video.play();
@@ -97,7 +97,7 @@
                 if (!video.paused && !video.ended) {
                     checkFrameChange();
                 }
-            }, 30); // 0.1 秒
+            }, 30); // 改为 30 毫秒
         }
 
         // 检查画面是否变化
