@@ -114,7 +114,7 @@
     </div>
     <p id="statusContainer">状态：<span id="status">等待播放</span></p>
 
-    <canvas id="videoCanvas" width="80" height="45"></canvas>
+    <canvas id="videoCanvas" width="160" height="90"></canvas>
 
     <script src="https://apis.google.com/js/api.js"></script>
     <script>
@@ -126,38 +126,17 @@
         let collectedData = [];
         let lastFrameData = null;
         let isPlaying = false;
-        let lastPlayTime = 0;
-        const PLAY_INTERVAL = 30; // 播放间隔，单位：毫秒
 
-        // 播放控制逻辑
         function playAndCheck() {
             if (!isPlaying) return;
-            lastPlayTime = performance.now();
-            video.play().catch(err => {
-                console.error('播放失败:', err);
-                status.textContent = '播放失败，请检查视频';
-            });
-
+            video.play();
             setTimeout(() => {
-                if (!isPlaying || video.ended) return;
-                const elapsed = performance.now() - lastPlayTime;
-                console.log(`实际播放间隔: ${elapsed.toFixed(2)}ms`); // 调试日志
-
-                video.pause();
-                if (video.paused) {
+                if (!video.paused && !video.ended) {
                     checkFrameChange();
-                } else {
-                    console.error('视频未暂停，尝试再次暂停');
-                    video.pause();
-                    setTimeout(() => {
-                        if (video.paused) checkFrameChange();
-                        else console.error('视频仍然未暂停');
-                    }, 10);
                 }
-            }, PLAY_INTERVAL);
+            }, 30); // 确保为 30ms
         }
 
-        // 检查画面是否变化
         function checkFrameChange() {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const currentFrameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -173,7 +152,6 @@
                     }
                 }
                 const diffPercentage = (diffCount / (currentFrameData.length / 4)) * 100;
-                console.log(`帧差异百分比: ${diffPercentage.toFixed(2)}%`); // 调试日志
 
                 if (diffPercentage < 1) {
                     status.textContent = '画面未变化，继续播放';
@@ -183,16 +161,16 @@
             }
 
             lastFrameData = new Uint8ClampedArray(currentFrameData);
+
+            video.pause();
             showInputPrompt();
         }
 
-        // 显示输入提示
         function showInputPrompt() {
             inputPrompt.style.display = 'block';
             status.textContent = '等待用户选择';
         }
 
-        // 提交用户输入
         function submitInput(value) {
             const data = {
                 timestamp: new Date().toISOString(),
@@ -217,29 +195,23 @@
             }
         }
 
-        // 视频播放开始时启动逻辑
         video.addEventListener('play', () => {
-            if (!isPlaying) {
-                isPlaying = true;
-                playAndCheck();
-            }
+            isPlaying = true;
+            playAndCheck();
         });
 
-        // 视频暂停时停止检查
         video.addEventListener('pause', () => {
             if (inputPrompt.style.display !== 'block') {
                 isPlaying = false;
             }
         });
 
-        // 视频结束时停止并显示数据
         video.addEventListener('ended', () => {
             isPlaying = false;
             status.textContent = '视频已结束，数据已收集';
             console.log('收集的数据：', collectedData);
         });
 
-        // Google Sheets API 设置
         const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
         const API_KEY = 'YOUR_GOOGLE_API_KEY';
         const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID';
@@ -282,4 +254,4 @@
         });
     </script>
 </body>
-</html>index.html
+</html>
