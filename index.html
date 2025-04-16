@@ -114,7 +114,7 @@
     </div>
     <p id="statusContainer">状态：<span id="status">等待播放</span></p>
 
-    <canvas id="videoCanvas" width="160" height="90"></canvas>
+    <canvas id="videoCanvas" width="80" height="45"></canvas> <!-- 降低分辨率以优化性能 -->
 
     <script src="https://apis.google.com/js/api.js"></script>
     <script>
@@ -126,17 +126,29 @@
         let collectedData = [];
         let lastFrameData = null;
         let isPlaying = false;
+        let lastPauseTime = 0;
+        const PLAY_INTERVAL = 30; // 播放间隔，单位：毫秒
 
+        // 播放控制逻辑
         function playAndCheck() {
             if (!isPlaying) return;
+            lastPauseTime = video.currentTime * 1000; // 转换为毫秒
             video.play();
-            setTimeout(() => {
-                if (!video.paused && !video.ended) {
-                    checkFrameChange();
-                }
-            }, 10); // 确保为 30ms
         }
 
+        // 监听视频时间更新，精确控制播放间隔
+        video.addEventListener('timeupdate', () => {
+            if (!isPlaying) return;
+            const currentTime = video.currentTime * 1000; // 转换为毫秒
+            const elapsed = currentTime - lastPauseTime;
+
+            if (elapsed >= PLAY_INTERVAL) {
+                video.pause();
+                checkFrameChange();
+            }
+        });
+
+        // 检查画面是否变化
         function checkFrameChange() {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const currentFrameData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -161,16 +173,16 @@
             }
 
             lastFrameData = new Uint8ClampedArray(currentFrameData);
-
-            video.pause();
             showInputPrompt();
         }
 
+        // 显示输入提示
         function showInputPrompt() {
             inputPrompt.style.display = 'block';
             status.textContent = '等待用户选择';
         }
 
+        // 提交用户输入
         function submitInput(value) {
             const data = {
                 timestamp: new Date().toISOString(),
@@ -195,23 +207,29 @@
             }
         }
 
+        // 视频播放开始时启动逻辑
         video.addEventListener('play', () => {
-            isPlaying = true;
-            playAndCheck();
+            if (!isPlaying) {
+                isPlaying = true;
+                playAndCheck();
+            }
         });
 
+        // 视频暂停时停止检查
         video.addEventListener('pause', () => {
             if (inputPrompt.style.display !== 'block') {
                 isPlaying = false;
             }
         });
 
+        // 视频结束时停止并显示数据
         video.addEventListener('ended', () => {
             isPlaying = false;
             status.textContent = '视频已结束，数据已收集';
             console.log('收集的数据：', collectedData);
         });
 
+        // Google Sheets API 设置
         const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
         const API_KEY = 'YOUR_GOOGLE_API_KEY';
         const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID';
